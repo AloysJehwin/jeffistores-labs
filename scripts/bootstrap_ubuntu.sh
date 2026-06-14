@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/AloysJehwin/jeffistores-labs.git"
-REPO_DIR="${REPO_DIR:-$HOME/code/jeffistores-labs}"
+REPO_DIR="${REPO_DIR:-$HOME/Documents/GitHub-Personal/jeffistores-labs}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.12}"
 
 log()  { printf '\033[1;36m[bootstrap]\033[0m %s\n' "$*"; }
