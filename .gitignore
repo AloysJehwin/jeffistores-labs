@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.python-version
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv
+.uv/
+uv.lock
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# ML — heavy artifacts (keep these local / on HF Hub, not git)
+data/*
+!data/README.md
+!data/.gitkeep
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+checkpoints/
+runs/
+wandb/
+mlruns/
+lightning_logs/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Misc
+*.log
+tmp/
