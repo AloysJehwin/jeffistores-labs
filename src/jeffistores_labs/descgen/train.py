@@ -177,19 +177,32 @@ def train(
 
     sft_kwargs.setdefault("report_to", "wandb" if config.wandb else "none")
 
+    # trl >= 1.0 dropped max_seq_length from SFTConfig — it auto-detects
+    # from the tokenizer. Pop it defensively so older configs still load.
+    max_seq_length = sft_kwargs.pop("max_seq_length", None)
+
     sft_config = SFTConfig(
         dataset_text_field="text",
         packing=False,            # one example per row, no concat
         **sft_kwargs,
     )
 
-    trainer = SFTTrainer(
+    trainer_kwargs: dict[str, Any] = dict(
         model=model,
-        tokenizer=tokenizer,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         args=sft_config,
+        processing_class=tokenizer,
     )
+    # Some trl versions still accept tokenizer; some prefer processing_class.
+    # If processing_class isn't supported, fall back to tokenizer.
+    try:
+        trainer = SFTTrainer(**trainer_kwargs)
+    except TypeError:
+        trainer_kwargs.pop("processing_class")
+        trainer_kwargs["tokenizer"] = tokenizer
+        trainer = SFTTrainer(**trainer_kwargs)
+    _ = max_seq_length  # quiet linter; trl auto-detects from tokenizer.model_max_length
 
     # -- Train + save ------------------------------------------------------
     trainer.train()

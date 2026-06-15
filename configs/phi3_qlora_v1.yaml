@@ -68,7 +68,9 @@ training:
   weight_decay: 0.01
   bf16: true
   gradient_checkpointing: true
-  max_seq_length: 1024
+  # max_seq_length was a top-level SFTConfig field in trl<1.0; in trl 1.x
+  # it's auto-detected from the tokenizer or set via dataset_kwargs.
+  # See train.py for where we pass it now.
   logging_steps: 10
   eval_strategy: steps
   eval_steps: 50
