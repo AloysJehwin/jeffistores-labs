@@ -1,0 +1,15 @@
+[Unit]
+Description=Nightly trigger for Jeffi RDS->Razer replication
+Documentation=https://github.com/AloysJehwin/jeffistores-labs
+
+[Timer]
+# 03:30 IST every day = 22:00 UTC the previous calendar day
+# We use IST directly so it survives daylight changes upstream
+OnCalendar=*-*-* 03:30:00 Asia/Kolkata
+RandomizedDelaySec=15min
+# If the Razer was off when the timer should have fired, run as soon as it boots
+Persistent=true
+Unit=jeffi-replicate.service
+
+[Install]
+WantedBy=timers.target

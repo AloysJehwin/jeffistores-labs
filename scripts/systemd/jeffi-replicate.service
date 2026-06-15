@@ -1,0 +1,26 @@
+[Unit]
+Description=Nightly replication of Jeffi prod RDS into local jeffi_replica
+Documentation=https://github.com/AloysJehwin/jeffistores-labs
+After=network-online.target postgresql.service tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aloysjehwin
+Group=aloysjehwin
+WorkingDirectory=/home/aloysjehwin/Documents/GitHub-Personal/jeffistores-labs
+# The script reads /etc/jeffistores-replication/.env (group-readable by aloysjehwin)
+ExecStart=/bin/bash /home/aloysjehwin/Documents/GitHub-Personal/jeffistores-labs/scripts/replicate_jeffi.sh
+# Don't fail the whole unit on transient SSH/network issues — log and move on
+SuccessExitStatus=0
+TimeoutStartSec=30min
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log /tmp /home/aloysjehwin
+PrivateTmp=true
+ProtectHome=read-only
+BindReadOnlyPaths=/home/aloysjehwin
+
+[Install]
+WantedBy=multi-user.target
