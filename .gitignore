@@ -26,9 +26,10 @@ uv.lock
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 *.swp
+# .vscode/ is intentionally tracked — settings.json pins the interpreter
+# to .venv so the repo Just Works on any machine
 
 # ML — heavy artifacts (keep these local / on HF Hub, not git)
 data/*
