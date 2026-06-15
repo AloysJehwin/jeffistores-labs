@@ -38,6 +38,20 @@ data = [
     "sqlalchemy>=2.0",
     "pyarrow>=17",
 ]
+descgen = [
+    # Stage 1 + 2 of experiments/04_jeffi_descgen — dataset + eval harness
+    "psycopg[binary]>=3.2",
+    "pandas>=2.2",
+    "sqlalchemy>=2.0",
+    "sacrebleu>=2.4",
+    "rouge-score>=0.1.2",
+    "sentence-transformers>=3.1",
+    # For Phi-3 zero-shot baseline + later QLoRA fine-tune
+    "transformers>=4.44",
+    "accelerate>=0.34",
+    "bitsandbytes>=0.43; platform_system != 'Darwin'",
+    "sentencepiece>=0.2",
+]
 dev = [
     "ruff>=0.6",
     "pytest>=8.3",
