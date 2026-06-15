@@ -169,10 +169,12 @@ def train(
     sft_kwargs["output_dir"] = str(output_dir)
     sft_kwargs["run_name"] = config.run_name
     if smoke_test and config.smoke:
+        smoke_save = config.smoke.get("save_steps", 25)
         sft_kwargs.update(
             max_steps=config.smoke.get("max_steps", 50),
-            save_steps=config.smoke.get("save_steps", 25),
-            num_train_epochs=1,  # ignored when max_steps is set
+            save_steps=smoke_save,
+            eval_steps=smoke_save,   # transformers requires save_steps % eval_steps == 0
+            num_train_epochs=1,      # ignored when max_steps is set
         )
 
     sft_kwargs.setdefault("report_to", "wandb" if config.wandb else "none")
