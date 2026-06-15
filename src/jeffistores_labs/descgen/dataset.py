@@ -97,8 +97,15 @@ _WS = re.compile(r"\s+")
 
 
 def _clean_text(s: str | None) -> str | None:
-    """Strip HTML tags and collapse whitespace. Returns None for empty inputs."""
+    """Strip HTML tags and collapse whitespace. Returns None for empty inputs.
+
+    Tolerates pandas' NaN floats (which is what NULL becomes when the column
+    has mixed types).
+    """
     if s is None:
+        return None
+    if not isinstance(s, str):
+        # pandas NaN, ints, floats — nothing useful
         return None
     s = _HTML_TAG.sub(" ", s)
     s = _WS.sub(" ", s).strip()
@@ -220,6 +227,19 @@ def fetch_raw() -> pd.DataFrame:
     return query(EXPORT_SQL, {"min_chars": MIN_DESC_CHARS, "max_chars": MAX_DESC_CHARS})
 
 
+def _to_float(v: Any) -> float | None:
+    """Pandas NaN-tolerant float coercion. Returns None for missing values."""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if f != f:  # NaN check (NaN != NaN)
+        return None
+    return f
+
+
 def row_to_example(row: pd.Series) -> Example:
     cleaned_desc = _clean_text(row["description"])
     if cleaned_desc is None:
@@ -233,11 +253,11 @@ def row_to_example(row: pd.Series) -> Example:
         material=row.get("material"),
         finish=row.get("finish"),
         size=row.get("size"),
-        length_cm=row.get("length_cm"),
-        breadth_cm=row.get("breadth_cm"),
-        height_cm=row.get("height_cm"),
-        weight_grams=row.get("weight_grams"),
-        mrp=row.get("mrp"),
+        length_cm=_to_float(row.get("length_cm")),
+        breadth_cm=_to_float(row.get("breadth_cm")),
+        height_cm=_to_float(row.get("height_cm")),
+        weight_grams=_to_float(row.get("weight_grams")),
+        mrp=_to_float(row.get("mrp")),
         short_description=row.get("short_description"),
     )
     p = _clean_input(p)
