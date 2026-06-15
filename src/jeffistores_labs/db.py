@@ -74,11 +74,13 @@ def list_tables(schema: str = "public") -> pd.DataFrame:
     """All tables in the schema with row estimates."""
     return query(
         """
-        SELECT relname AS table, n_live_tup AS rows_est, pg_size_pretty(pg_total_relation_size(c.oid)) AS size
+        SELECT s.relname AS table,
+               s.n_live_tup AS rows_est,
+               pg_size_pretty(pg_total_relation_size(c.oid)) AS size
         FROM pg_stat_user_tables s
         JOIN pg_class c ON c.oid = s.relid
-        WHERE schemaname = :schema
-        ORDER BY n_live_tup DESC
+        WHERE s.schemaname = :schema
+        ORDER BY s.n_live_tup DESC
         """,
         {"schema": schema},
     )
