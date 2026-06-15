@@ -210,8 +210,8 @@ FROM products p
 LEFT JOIN brands     b ON p.brand_id    = b.id
 LEFT JOIN categories c ON p.category_id = c.id
 WHERE p.description IS NOT NULL
-  AND length(p.description) >= %(min_chars)s
-  AND length(p.description) <= %(max_chars)s
+  AND length(p.description) >= :min_chars
+  AND length(p.description) <= :max_chars
 """
 
 
