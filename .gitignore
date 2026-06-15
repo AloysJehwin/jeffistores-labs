@@ -46,6 +46,8 @@ runs/
 wandb/
 mlruns/
 lightning_logs/
+adapter-final/
+adapter-best/
 
 # Secrets
 .env

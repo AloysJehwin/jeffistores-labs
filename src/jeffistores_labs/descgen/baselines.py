@@ -17,6 +17,7 @@ Why these specific baselines:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .dataset import Example, ProductInput, render_input_block, to_chat_messages
@@ -141,6 +142,92 @@ class Phi3ZeroShotGenerator:
         # up to date. Tokenizer is fine either way.
         tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         model = AutoModelForCausalLM.from_pretrained(self.model_id, **kwargs)
+        self._pipe = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            return_full_text=False,
+        )
+
+    def generate(self, product: ProductInput) -> str:
+        self._ensure_loaded()
+        messages = to_chat_messages(product, target=None)
+        out = self._pipe(  # type: ignore[misc]
+            messages,
+            max_new_tokens=self.max_new_tokens,
+            do_sample=self.temperature > 0,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            pad_token_id=self._pipe.tokenizer.eos_token_id,
+        )
+        return out[0]["generated_text"].strip()
+
+
+# -----------------------------------------------------------------------------
+# Fine-tuned generator — Stage 3 output, evaluated through the same harness
+# -----------------------------------------------------------------------------
+
+
+class FineTunedGenerator:
+    """A QLoRA-fine-tuned Phi-3 (or whatever) loaded from a saved adapter.
+
+    Conforms to the same `Generator` protocol as the baselines so eval.py
+    can score it identically. The base model is loaded with the same 4-bit
+    quantization as during training, then the LoRA adapter is layered on
+    top via PEFT.
+    """
+
+    def __init__(
+        self,
+        adapter_path: str,
+        base_model_id: str = "microsoft/Phi-3.5-mini-instruct",
+        name: str | None = None,
+        max_new_tokens: int = 220,
+        temperature: float = 0.3,
+        top_p: float = 0.9,
+        load_in_4bit: bool = True,
+    ):
+        self.adapter_path = adapter_path
+        self.base_model_id = base_model_id
+        self.name = name or f"finetuned:{Path(adapter_path).name}"
+        self.max_new_tokens = max_new_tokens
+        self.temperature = temperature
+        self.top_p = top_p
+        self.load_in_4bit = load_in_4bit
+        self._pipe: Any = None
+
+    def _ensure_loaded(self) -> None:
+        if self._pipe is not None:
+            return
+        import torch
+        from peft import PeftModel  # type: ignore[import-untyped]
+        from transformers import (  # type: ignore[import-untyped]
+            AutoModelForCausalLM,
+            AutoTokenizer,
+            BitsAndBytesConfig,
+            pipeline,
+        )
+
+        kwargs: dict[str, Any] = {"device_map": "auto", "torch_dtype": torch.bfloat16}
+        if self.load_in_4bit:
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
+        # Load adapter's tokenizer if it was saved alongside; otherwise base.
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(self.adapter_path)
+        except Exception:
+            tokenizer = AutoTokenizer.from_pretrained(self.base_model_id)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        base = AutoModelForCausalLM.from_pretrained(self.base_model_id, **kwargs)
+        model = PeftModel.from_pretrained(base, self.adapter_path)
+        # We don't merge — keeps the base cached and the adapter swappable.
+
         self._pipe = pipeline(
             "text-generation",
             model=model,

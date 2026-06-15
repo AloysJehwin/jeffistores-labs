@@ -51,6 +51,11 @@ descgen = [
     "accelerate>=0.34",
     "bitsandbytes>=0.43; platform_system != 'Darwin'",
     "sentencepiece>=0.2",
+    # Stage 3 — QLoRA training
+    "peft>=0.13",
+    "trl>=0.11",
+    "pyyaml>=6.0",
+    "wandb>=0.18",
 ]
 dev = [
     "ruff>=0.6",

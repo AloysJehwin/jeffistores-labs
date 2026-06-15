@@ -1,0 +1,93 @@
+# Stage 3 — QLoRA fine-tune of Phi-3.5-mini on Jeffi product descriptions
+#
+# This file is the source of truth for one training run. To start a new
+# experiment, copy it to phi3_qlora_v2.yaml etc. and bump `run_name`.
+#
+# What each knob does, in plain English:
+#
+# base_model:        the open-weights LLM we adapt. Phi-3.5-mini-instruct is
+#                    3.8B params — fits in 12GB VRAM with 4-bit quantization.
+#                    Same model the zero-shot baseline used.
+# quant_*:           4-bit NF4 quantization via bitsandbytes. Lets us load
+#                    a 3.8B model in ~2GB VRAM, leaving room for activations
+#                    + gradients. Without this, OOM on the 4080 Laptop.
+# lora_r / alpha:    rank of the low-rank update + scaling. Higher r =
+#                    more capacity but more params + slower. r=8 is the
+#                    "boring sensible default" — start here, sweep later.
+# target_modules:    which weight matrices LoRA inserts adapters into.
+#                    Q/K/V/O projections cover the attention block. Adding
+#                    gate/up/down covers the MLPs (more capacity, slower).
+#                    Start with attention only.
+# learning_rate:     2e-4 is the canonical Phi-3 LoRA LR. If loss is flat,
+#                    try 5e-4. If loss is spiky/NaN, try 1e-4.
+# epochs:            with 761 train examples and r=8, 3 epochs is enough
+#                    to fit. More than 5 risks overfitting (we'll see in
+#                    the val loss curve).
+# batch_size + accum: per-step batch=1 (12GB tight), accumulate 8 steps
+#                    -> effective batch=8. Trade memory for wall time.
+# max_seq_length:    1024 covers ~99% of (system + input + output) tokens
+#                    in our dataset. See dataset_stats notebook.
+# warmup_ratio:      0.03 — bog-standard. Avoid loss spike at step 1.
+# eval_steps:        run val-set eval every 50 steps so we can spot the
+#                    overfitting inflection.
+# save_strategy:     keep the lowest val_loss checkpoint. We don't keep
+#                    the last one — last ≠ best.
+# wandb_*:           optional but on by default. Comment out the project
+#                    line to disable.
+
+run_name: phi3-qlora-v1
+
+base_model: microsoft/Phi-3.5-mini-instruct
+
+# 4-bit NF4 quantization
+quant:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+# LoRA — start small, sweep up later
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  bias: none
+  task_type: CAUSAL_LM
+
+# Training loop
+training:
+  output_dir: data/jeffi_descgen/v1/checkpoints/phi3-qlora-v1
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  bf16: true
+  gradient_checkpointing: true
+  max_seq_length: 1024
+  logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 50
+  save_strategy: steps
+  save_steps: 50
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  seed: 42
+
+# Smoke test mode — set max_steps for a quick verification run.
+# Set to null (or remove the key) for a real training run.
+smoke:
+  max_steps: 50
+  save_steps: 25     # so we save at least once during the smoke
+
+wandb:
+  project: jeffi-descgen
+  # set to null to disable W&B entirely
+  # tags applied to every run from this config
+  tags: [stage3, smoke-test]
