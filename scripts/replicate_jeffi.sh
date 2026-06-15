@@ -126,12 +126,18 @@ log "Dump complete: $(numfmt --to=iec --suffix=B "$DUMP_SIZE")"
 STAGING_DB="${LOCAL_DB}_staging"
 log "Restoring into $STAGING_DB ..."
 
+# Read local password from ~/.pgpass (format: host:port:db:user:pass)
+LOCAL_PASS=$(awk -F: -v u="$LOCAL_USER" -v d="$LOCAL_DB" '$3==d && $4==u {print $5; exit}' "$HOME/.pgpass")
+if [[ -z "$LOCAL_PASS" ]]; then
+    fail "could not find local password in ~/.pgpass for $LOCAL_USER@$LOCAL_DB"
+fi
+
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 DROP DATABASE IF EXISTS ${STAGING_DB};
 CREATE DATABASE ${STAGING_DB} OWNER ${LOCAL_USER};
 SQL
 
-PGPASSFILE="$HOME/.pgpass" pg_restore \
+PGPASSWORD="$LOCAL_PASS" pg_restore \
     -h localhost -U "$LOCAL_USER" -d "$STAGING_DB" \
     --no-owner --no-privileges \
     --jobs=4 \
@@ -139,7 +145,7 @@ PGPASSFILE="$HOME/.pgpass" pg_restore \
     "$DUMP_FILE" || fail "pg_restore failed"
 
 # Row count for the log (sum across user tables)
-ROW_COUNT=$(PGPASSFILE="$HOME/.pgpass" psql -h localhost -U "$LOCAL_USER" -d "$STAGING_DB" -tAc "
+ROW_COUNT=$(PGPASSWORD="$LOCAL_PASS" psql -h localhost -U "$LOCAL_USER" -d "$STAGING_DB" -tAc "
 SELECT COALESCE(SUM(n_live_tup), 0)
 FROM pg_stat_user_tables
 WHERE schemaname = 'public';
