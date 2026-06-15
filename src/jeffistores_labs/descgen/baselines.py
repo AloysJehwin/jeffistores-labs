@@ -135,10 +135,12 @@ class Phi3ZeroShotGenerator:
                 bnb_4bit_use_double_quant=True,
             )
 
-        tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            self.model_id, trust_remote_code=True, **kwargs
-        )
+        # NOTE: trust_remote_code=False — the bundled Phi-3 modeling_phi3.py
+        # in some HF revisions calls past_key_values.seen_tokens which was
+        # removed from modern transformers. The library's own Phi-3 impl is
+        # up to date. Tokenizer is fine either way.
+        tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        model = AutoModelForCausalLM.from_pretrained(self.model_id, **kwargs)
         self._pipe = pipeline(
             "text-generation",
             model=model,
