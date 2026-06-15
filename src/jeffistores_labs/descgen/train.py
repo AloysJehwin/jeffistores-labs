@@ -177,7 +177,13 @@ def train(
             num_train_epochs=1,      # ignored when max_steps is set
         )
 
-    sft_kwargs.setdefault("report_to", "wandb" if config.wandb else "none")
+    # report_to: respect WANDB_DISABLED=true so smoke tests don't need a login
+    import os
+    wandb_disabled = os.environ.get("WANDB_DISABLED", "").lower() in {"true", "1", "yes"}
+    if wandb_disabled:
+        sft_kwargs["report_to"] = "none"
+    else:
+        sft_kwargs.setdefault("report_to", "wandb" if config.wandb else "none")
 
     # trl >= 1.0 dropped max_seq_length from SFTConfig — it auto-detects
     # from the tokenizer. Pop it defensively so older configs still load.
