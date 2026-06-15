@@ -31,6 +31,13 @@ hf = [
 track = [
     "wandb>=0.18",
 ]
+data = [
+    # Querying jeffi_replica from notebooks
+    "psycopg[binary]>=3.2",
+    "pandas>=2.2",
+    "sqlalchemy>=2.0",
+    "pyarrow>=17",
+]
 dev = [
     "ruff>=0.6",
     "pytest>=8.3",
