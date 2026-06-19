@@ -62,11 +62,11 @@ cleanup() {
 trap cleanup EXIT
 
 post_admin_log() {
-    local status="$1" message="$2" duration="$3" rows="${4:-null}"
+    local status="$1" message="$2" duration="$3" rows="${4:-null}" dump_bytes="${5:-null}"
     [[ -z "$ADMIN_LOG_URL" || -z "$ADMIN_LOG_TOKEN" ]] && return 0
     local payload
-    payload=$(printf '{"run_id":"%s","status":"%s","message":%s,"duration_seconds":%s,"row_count":%s,"source":"razer"}' \
-        "$RUN_ID" "$status" "$(jq -Rn --arg m "$message" '$m')" "$duration" "$rows")
+    payload=$(printf '{"run_id":"%s","status":"%s","message":%s,"duration_seconds":%s,"row_count":%s,"dump_bytes":%s,"source":"razer"}' \
+        "$RUN_ID" "$status" "$(jq -Rn --arg m "$message" '$m')" "$duration" "$rows" "$dump_bytes")
     curl --silent --show-error --max-time 30 \
         -H "Authorization: Bearer $ADMIN_LOG_TOKEN" \
         -H "Content-Type: application/json" \
@@ -80,7 +80,7 @@ finish() {
     now=$(date -u +%s)
     duration=$((now - START_EPOCH))
     log "STATUS=$status DURATION=${duration}s"
-    post_admin_log "$status" "$message" "$duration"
+    post_admin_log "$status" "$message" "$duration" "${ROW_COUNT:-null}" "${DUMP_SIZE:-null}"
 }
 
 # -----------------------------------------------------------------------------
@@ -112,9 +112,12 @@ log "Dumping $RDS_DATABASE via tunnel (custom format, compressed)..."
 PGPASSWORD="$RDS_MASTER_PASSWORD" pg_dump \
     -h 127.0.0.1 -p "$LOCAL_TUNNEL_PORT" \
     -U "$RDS_MASTER_USER" -d "$RDS_DATABASE" \
-    --format=custom --compress=9 \
+    --format=custom --compress=3 \
     --no-owner --no-privileges \
     --jobs=1 \
+    --exclude-table=admin_audit_log \
+    --exclude-table=merchant_sync_log \
+    --exclude-table=product_ai_enrichment_log \
     -f "$DUMP_FILE" || fail "pg_dump failed"
 
 DUMP_SIZE=$(stat -c %s "$DUMP_FILE")
@@ -170,4 +173,4 @@ SQL
 # -----------------------------------------------------------------------------
 NOW=$(date -u +%s); DURATION=$((NOW - START_EPOCH))
 log "OK: duration=${DURATION}s rows=$ROW_COUNT dump=$(numfmt --to=iec --suffix=B "$DUMP_SIZE")"
-post_admin_log "ok" "rows=$ROW_COUNT dump=$DUMP_SIZE" "$DURATION" "$ROW_COUNT"
+post_admin_log "ok" "rows=$ROW_COUNT dump=$DUMP_SIZE" "$DURATION" "$ROW_COUNT" "$DUMP_SIZE"
