@@ -1,0 +1,18 @@
+[Unit]
+Description=Jeffi Stores incremental DB sync (RDS → Razer replica)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=aloysjehwin
+ExecStart=/bin/bash /home/aloysjehwin/jeffistores-labs/scripts/sync_incremental.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jeffi-incremental-sync
+
+# Don't fail the timer if the script exits non-zero — log it and move on
+SuccessExitStatus=0 1 2
+
+[Install]
+WantedBy=multi-user.target

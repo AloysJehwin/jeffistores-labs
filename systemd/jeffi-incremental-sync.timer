@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Jeffi incremental DB sync every 30 minutes
+Requires=jeffi-incremental-sync.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
