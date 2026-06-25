@@ -43,6 +43,9 @@ data/*
 *.onnx
 checkpoints/
 runs/
+# But DO track per-experiment run logs (loss curves, JSONL metrics) — they are
+# the artifact of record for each experiment.
+!experiments/**/runs/
 wandb/
 mlruns/
 lightning_logs/

@@ -1,0 +1,70 @@
+# Stage 3 — V2: QDoRA fine-tune of Phi-3.5-mini on Jeffi product descriptions
+#
+# Identical to phi3_qlora_v1.yaml EXCEPT:
+#   - run_name                 phi3-qlora-v1 -> phi3-qdora-v2
+#   - output_dir               .../phi3-qlora-v1 -> .../phi3-qdora-v2
+#   - lora.use_dora            (new)          -> true
+#   - wandb.tags               [stage3, smoke-test] -> [stage3, dora]
+#
+# Everything else (data, seed, LR, target_modules, r, alpha, schedule,
+# warmup, dropout, epochs, batch, grad-accum, dtype) is held constant so
+# the only experimental variable is the DoRA flag.
+#
+# DoRA reference: Liu et al. 2024, https://arxiv.org/abs/2402.09353
+# PEFT support:   peft >= 0.10 on `Linear` modules; verified 0.19.1 on Razer.
+#
+# Expected per-step cost: DoRA is ~15-30% slower than vanilla LoRA. Smoke
+# test confirms / refutes this estimate before the real run.
+
+run_name: phi3-qdora-v2
+
+base_model: microsoft/Phi-3.5-mini-instruct
+
+# 4-bit NF4 quantization — same as v1.
+quant:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+# LoRA — same rank/alpha/dropout/targets as v1, plus DoRA flag.
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  bias: none
+  task_type: CAUSAL_LM
+  use_dora: true
+
+# Training loop — identical to v1 except output_dir.
+training:
+  output_dir: data/jeffi_descgen/v1/checkpoints/phi3-qdora-v2
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 50
+  save_strategy: steps
+  save_steps: 50
+  save_total_limit: 3
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  seed: 42
+
+smoke:
+  max_steps: 50
+  save_steps: 25
+
+wandb:
+  project: jeffi-descgen
+  tags: [stage3, dora]
