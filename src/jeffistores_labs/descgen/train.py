@@ -68,6 +68,44 @@ class TrainingConfig:
 # -----------------------------------------------------------------------------
 
 
+# Per-run metrics dumper. Independent of W&B — works offline, survives across
+# trl/transformers versions, gives us a stable artifact we can diff against
+# future runs. One file per run_name; JSON-per-line so it streams.
+_RUNS_DIR = Path(__file__).resolve().parents[3] / "experiments" / "04_jeffi_descgen" / "runs"
+
+
+class _JsonlMetricsCallback:
+    """Writes every TrainerState log dict as one JSON line to disk.
+
+    We don't subclass `TrainerCallback` at class-definition time because
+    importing transformers at module import is expensive and we want this
+    module to stay cheap to import. Instead we build the subclass lazily
+    inside a factory and return an instance of *that* class. The result is
+    duck-typed compatible with the trainer's callback protocol *and*
+    inherits every no-op event handler from the official base, so we're
+    forward-compatible with new TrainerCallback methods (e.g. transformers
+    5.x added `on_pre_optimizer_step`).
+    """
+
+    def __new__(cls, run_name: str):
+        from transformers import TrainerCallback as _TC
+
+        _RUNS_DIR.mkdir(parents=True, exist_ok=True)
+        path = _RUNS_DIR / f"{run_name}.jsonl"
+        path.write_text("")  # truncate on each run
+
+        class _Impl(_TC):
+            def on_log(self, args, state, control, logs=None, **kwargs):  # type: ignore[override]
+                if not logs:
+                    return
+                import json as _json
+                record = {"step": state.global_step, "epoch": state.epoch, **logs}
+                with path.open("a", encoding="utf-8") as f:
+                    f.write(_json.dumps(record, default=str) + "\n")
+
+        return _Impl()
+
+
 def format_for_chat_template(example: Example, tokenizer: Any) -> dict[str, str]:
     """Render one Example into a single text string the trainer can tokenize.
 
@@ -156,6 +194,7 @@ def train(
         target_modules=config.lora.get("target_modules"),
         bias=config.lora.get("bias", "none"),
         task_type=config.lora.get("task_type", "CAUSAL_LM"),
+        use_dora=config.lora.get("use_dora", False),
     )
     model = get_peft_model(model, peft_cfg)
     model.print_trainable_parameters()  # sanity print: ~0.1–1% of params
@@ -201,6 +240,7 @@ def train(
         eval_dataset=val_ds,
         args=sft_config,
         processing_class=tokenizer,
+        callbacks=[_JsonlMetricsCallback(config.run_name)],
     )
     # Some trl versions still accept tokenizer; some prefer processing_class.
     # If processing_class isn't supported, fall back to tokenizer.
