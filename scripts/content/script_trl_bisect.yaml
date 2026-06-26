@@ -1,0 +1,50 @@
+title: trl-3910-bisect-demo
+
+# Voice for all narration unless overridden per-scene.
+voice_id: Matthew
+
+# Notes on the design choices:
+#   - 4 scenes, ~3-4 sec of narration each, total ~16 sec
+#   - First 3 scenes are SVD-animated atmospheric SDXL stills
+#   - Scene 3 ("the cliff" / the actual finding) uses our matplotlib chart
+#     directly as a static frame — SVD would mangle it, and the chart is
+#     the substance of the post anyway
+#   - Low motion_bucket_id (40-80) — we want subtle motion, not pans
+#   - Each prompt is photographic in style, not "diagram" — that's what
+#     SVD knows how to animate without artifacts
+
+scenes:
+  - prompt: >
+      photograph of a developer at a desk late at night, computer
+      screen glowing softly, shallow depth of field, moody warm
+      lighting, cinematic, 35mm film grain
+    narration: >
+      You upgraded huggingface trl past zero point nineteen. Suddenly your S F T loss
+      curves go flat.
+    motion: 60
+    seed: 11
+
+  - prompt: >
+      close-up photograph of a terminal screen with green-on-black
+      text scrolling, slightly out of focus, bokeh, cinematic mood
+    narration: >
+      You blame trl. You bisect. Sixty-six commits. Eight iterations.
+    motion: 80
+    seed: 23
+
+  # Static chart scene — overrides image generation by providing a real image path.
+  - static_image: experiments/04_jeffi_descgen/runs/post_image_B_curve.png
+    narration: >
+      But trl is innocent. The cliff is in transformers. P R forty two thousand eight
+      hundred five flipped the default torch d type from float thirty two to auto.
+    motion: 30
+    seed: 31
+
+  - prompt: >
+      minimalist clean technical workspace, single line of Python code
+      glowing on a screen, dark background, professional, depth of field
+    narration: >
+      The fix is one argument. Torch d type equals torch dot float thirty two. Pass
+      it explicitly. Link in the replies.
+    motion: 50
+    seed: 47
