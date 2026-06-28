@@ -204,6 +204,30 @@ PGPASSWORD="$RDS_MASTER_PASSWORD" pg_dump \
 DUMP_SIZE=$(stat -c %s "$DUMP_FILE")
 log "Dump complete: $(numfmt --to=iec --suffix=B "$DUMP_SIZE")"
 
+# Read local password early — needed for embeddings pre-dump in step 2b
+LOCAL_PASS_PRE=$(awk -F: -v u="$LOCAL_USER" -v d="$LOCAL_DB" '$3==d && $4==u {print $5; exit}' "$HOME/.pgpass")
+
+# -----------------------------------------------------------------------------
+# 2b. Preserve existing embeddings before overwriting jeffi_replica
+# -----------------------------------------------------------------------------
+EMBED_DUMP_FILE="$WORKDIR/embeddings.dump"
+EMBED_COUNT=0
+if PGPASSWORD="$LOCAL_PASS_PRE" psql -h localhost -U "$LOCAL_USER" -d "$LOCAL_DB" \
+        -tAc "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='embeddings'" 2>/dev/null | grep -q 1; then
+    EMBED_COUNT=$(PGPASSWORD="$LOCAL_PASS_PRE" psql -h localhost -U "$LOCAL_USER" -d "$LOCAL_DB" \
+        -tAc "SELECT COUNT(*) FROM embeddings" 2>/dev/null || echo 0)
+    log "Dumping $EMBED_COUNT existing embeddings rows..."
+    PGPASSWORD="$LOCAL_PASS_PRE" pg_dump \
+        -h localhost -U "$LOCAL_USER" -d "$LOCAL_DB" \
+        --format=custom --compress=3 \
+        --no-owner --no-privileges \
+        -t embeddings \
+        -f "$EMBED_DUMP_FILE" || { log "warn: embeddings dump failed — will rebuild from scratch"; EMBED_DUMP_FILE=""; }
+else
+    log "No existing embeddings table — will be built fresh by sync_incremental"
+    EMBED_DUMP_FILE=""
+fi
+
 # -----------------------------------------------------------------------------
 # 3. Restore into fresh staging DB
 # -----------------------------------------------------------------------------
@@ -248,6 +272,22 @@ DROP DATABASE IF EXISTS ${LOCAL_DB}_old;
 ALTER DATABASE ${LOCAL_DB} RENAME TO ${LOCAL_DB}_old;
 ALTER DATABASE ${STAGING_DB} RENAME TO ${LOCAL_DB};
 SQL
+
+# -----------------------------------------------------------------------------
+# 4b. Restore preserved embeddings into new jeffi_replica
+# -----------------------------------------------------------------------------
+if [[ -n "${EMBED_DUMP_FILE:-}" && -f "$EMBED_DUMP_FILE" ]]; then
+    log "Restoring $EMBED_COUNT embeddings rows into $LOCAL_DB ..."
+    PGPASSWORD="$LOCAL_PASS" pg_restore \
+        -h localhost -U "$LOCAL_USER" -d "$LOCAL_DB" \
+        --no-owner --no-privileges \
+        --exit-on-error \
+        "$EMBED_DUMP_FILE" \
+    && log "Embeddings restored OK" \
+    || log "warn: embeddings restore failed — sync_incremental will rebuild"
+else
+    log "No embeddings dump to restore — sync_incremental will build from scratch"
+fi
 
 # -----------------------------------------------------------------------------
 # 5. Done
