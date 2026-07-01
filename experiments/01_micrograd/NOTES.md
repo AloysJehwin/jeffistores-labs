@@ -26,3 +26,7 @@ Format:
 2026-07-02 [jeffi-products]: LR=0.05 diverged after step 50 on the jeffi 5-class problem — loss climbed from 1.65 back to 4.49 while accuracy flatlined at 48%. Same LR that worked on Iris (120 examples, 3 classes) overshoots on a harder surface (702 examples, 5 classes with heavy overlap). Fix: lr=0.01.
 
 2026-07-02 [jeffi-products]: Screws, Bolts, and Nuts have nearly identical median dimensions (20×15×4cm, 500g) — the confusion matrix will be a mess for those three. Drill Bits (thin, light, 100g) and Non-Sparking Tools separate more cleanly. Physical dims alone can't distinguish fastener subtypes; you'd need material or thread-pitch data.
+
+2026-07-02 [description-classifier]: TF-IDF + LogReg on product descriptions hit 97.2% test accuracy vs 50.4% for the physical-dims MLP — a 47pp gap from switching features, not architecture. The bottleneck was never the neural network. A 30-year-old linear model on text beats a hand-built autograd MLP on dims because the signal was in the words all along: "hex bolt", "socket head cap screw", "non sparking" are unambiguous; 20×15×4cm is not.
+
+2026-07-02 [description-classifier]: The only confusion was 4 Nuts → Bolts. Makes sense: both are hex, both cite IS standards, both mention phosphate finish. You'd need thread-pitch or head-type tokens to split those. Everything else was perfect separation.
